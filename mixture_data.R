@@ -34,7 +34,7 @@ for(id in ids){
   # sigmas<-c(sigmas,best$sigma)
   # lambdas<-c(lambdas,best$lambda)
 }
-saveRDS(best, file = "best_fit_mixture_data.RDS")
+saveRDS(best_fits, file = "best_fit_mixture_data.RDS")
 # dev.off()
 #veiem el plot que només funcionava en alguns, p.e 0-3,7-9, pero depenia de la iteracio, s'ha de fer el fit millor, iterant i maximitzant loglik (fet)
 #sembla clarament degut a la asimetria, provar amb gamma
