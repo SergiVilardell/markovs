@@ -33,7 +33,6 @@ for (x in x_seq){
 }
 
 
-
 colfunc <- colorRampPalette(c("red", "blue"))
 colors_palette <- colfunc(100)
 
@@ -63,6 +62,7 @@ p_gauss <- plot_data %>%
   scale_color_manual(values =  colors,
                      name= "")+
   theme(legend.position = c(0.6, 0.4))+
+  guides(color = guide_legend(reverse = TRUE))+
   labs(x = "Time", y = "CCDF")
 p_gauss
 ggsave(p, width = 3, height = 3, file = "markov_gaussian.pdf") 
@@ -158,9 +158,23 @@ ggsave(plo_gumbel, width = 3, height = 3, file = "markov_gumbel.pdf")
 
 # Combination markov ------------------------------------------------------
 library(ggpubr)
-ggsave(ggarrange(p_gauss , p_weib, p_gumbel,nrow = 1), width = 10, height = 3, file = "markov_comb.pdf")
+ggsave(ggarrange(p_gauss , p_weib,nrow = 1), width = 6, height = 3, file = "markov_comb.pdf")
 
 # Multi-example -----------------------------------------------------------
+
+#Gaussian
+
+
+# Make mixture
+mean1 <- 100
+sd1 <- 10
+
+
+x_seq <- seq(from = 1,  to = 600, length.out = 1000)
+mixture_ccdf <- c()
+for (x in x_seq){
+  mixture_ccdf <- c(mixture_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
+}
 
 ks <- c(10,50,90)
 plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
@@ -173,21 +187,70 @@ for (k in ks){
   #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
 }
 
-
+melted_plot_data <- melt(plot_data, id.vars = "x")
 
 p <- melted_plot_data %>% 
   ggplot()+
   geom_line(aes(x = x, y = value, color = variable, size = variable))+
   scale_y_log10(limits = c(1e-8,10))+
+  xlim(c(0,300))+
   scale_color_manual(values = c("black", "red", "darkviolet", "blue"), 
                      name= "",
-                     labels = c("Distribution","k = 10","k = 50","k = 90"))+
-  scale_size_manual(values = c(1, 1.5, 1.5, 1.5), guide = FALSE)+
-  theme(legend.position = c(0.2, 0.4))+
+                     labels = c("Gaussian","k = 10","k = 50","k = 90"))+
+  scale_size_manual(values = c(1, 1, 1, 1), guide = FALSE)+
+  theme(legend.position = c(0.25, 0.3),
+        legend.key.size = unit(0.4, 'cm'))+
   labs(x = "Time", y = "CCDF")
+p
+
+#Weibull
+
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape <- 1/4
+
+# kth moment of the weibull distribution
+weibull_k_moment <- function(k, scale, shape){
+  (scale^k)*gamma(1 + k/shape)
+}
+
+x_seq <- seq(from = 0, to = 600, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = 1/shape, scale = scale))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+ks <- c(10,50,90)
+for (k in ks){
+  e_k <- weibull_k_moment(k = k, shape = 1/shape, scale = scale)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+melted_plot_data <- melt(plot_data, id.vars = "x")
+
+p_weib <- melted_plot_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = value, color = variable, size = variable))+
+  scale_y_log10(limits = c(1e-8,10))+
+  xlim(c(0,300))+
+  scale_color_manual(values = c("black", "red", "darkviolet", "blue"), 
+                     name= "",
+                     labels = c("Weibull","k = 10","k = 50","k = 90"))+
+  scale_size_manual(values = c(1, 1, 1, 1), guide = FALSE)+
+  theme(legend.position = c(0.3, 0.3),
+        legend.key.size = unit(0.4, 'cm'))+
+  labs(x = "Time", y = "CCDF")
+p_weib
 
 ggsave(p, width = 5, height = 3, file = "markov_gaussian_multik_example.pdf") 
 
+ggsave(ggarrange(p , p_weib), width = 6, height = 3, file = "markov_comb_K3.pdf")
 
 
 
