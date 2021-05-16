@@ -5,6 +5,7 @@ library(tidyverse)
 library(data.table)
 library(showtext)
 library(ggrepel)
+library(ggpubr)
 font_add("lmroman", regular = "D:/BSC/Latin-Modern-Roman/lmroman12-regular.otf")
 font_add("lmroman", regular = "D:/BSC/Latin-Modern-Roman/lmroman10-regular.otf")
 showtext_auto()
@@ -258,7 +259,11 @@ ggsave(ggarrange(p , p_weib), width = 6, height = 3, file = "markov_comb_K3.pdf"
 # Get best k Gaussian -----------------------------------------------------
 
 
-p_test <- 1-1e-3
+# Make mixture
+mean1 <- 100
+sd1 <- 10
+
+
 ks <- seq(from = 5, to = 200, by = 2)
 get_data_best_k <- function(p_test){
   x_test <- qnorm(p_test, mean = mean1, sd = sd1)
@@ -282,9 +287,9 @@ get_data_best_k <- function(p_test){
   return(data_test_k)
 }
 
-data_test_k_6 <- get_data_best_k(1-1e-6)
-data_test_k_9 <- get_data_best_k(1-1e-9)
-data_test_k_12 <- get_data_best_k(1-1e-12)
+data_test_k_6 <- get_data_best_k(1-1e-9)
+data_test_k_9 <- get_data_best_k(1-1e-12)
+data_test_k_12 <- get_data_best_k(1-1e-15)
 qnorm(p_test, mean = mean1, sd = sd1)
 
 get_min_k <- function(data_plot){
@@ -304,20 +309,20 @@ data_plot_best_k_12 <- tibble(y = data_test_k_12, x = ks[1:length(data_test_k_12
 
 
 viridis_colors <- viridis::viridis(4)
-colors <- c("1e-6" = viridis_colors[3], 
-            "1e-9" = viridis_colors[1],
-            "1e-12" = viridis_colors[2])
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[1],
+            "1e-15" = viridis_colors[2])
 
 labels <- factor(c("1e-06","1e-09","1e-12"), levels = c("1e-6","1e-9","1e-12"))
-colors <- c("1e-06" = viridis_colors[3], 
-            "1e-09" = viridis_colors[2],
-            "1e-12" = viridis_colors[1])
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[2],
+            "1e-15" = viridis_colors[1])
 pl_best_k <-  ggplot()+
-  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-06"))+
-  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-09"))+
-  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-09"))+
+  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-15"))+
   geom_label_repel(data          = subset(data_plot_best_k_6, x == get_min_k(data_plot_best_k_6) ),
-                   aes(x = x, y = y, color = "1e-06", label = label),
+                   aes(x = x, y = y, color = "1e-09", label = label),
                    show.legend = FALSE,
                    size          = 4,
                    vjust = 1,
@@ -326,31 +331,31 @@ pl_best_k <-  ggplot()+
                    point.padding = 0.5,
                    force         = 100,
                    segment.size  = 0.2,
-                   segment.color = "1e-06",
+                   segment.color = "1e-09",
                    direction     = "y")+
   geom_label_repel(data          = subset(data_plot_best_k_9, x == get_min_k(data_plot_best_k_9) ),
-                   aes(x = x, y = y, color = "1e-09", label = label),
+                   aes(x = x, y = y, color = "1e-12", label = label),
                    show.legend = FALSE,
                    size          = 4,
                    vjust = 1,
                    nudge_x = 3,
                    box.padding   = 0.1,
                    point.padding = 0.5,
-                   force         = 100,
+                   force         = 75,
                    segment.size  = 0.2,
-                   segment.color = "1e-09",
+                   segment.color = "1e-12",
                    direction     = "y")+
 geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data_plot_best_k_12) ),
-                 aes(x = x, y = y, color = "1e-12", label = label),
+                 aes(x = x, y = y, color = "1e-15", label = label),
                  show.legend = FALSE,
                  size          = 4,
                  vjust = 1,
                  nudge_x = 3,
                  box.padding   = 0.1,
                  point.padding = 0.5,
-                 force         = 100,
+                 force         = 65,
                  segment.size  = 0.2,
-                 segment.color = "1e-12",
+                 segment.color = "1e-15",
                  direction     = "y")+
   scale_color_manual(values = colors)+
   labs(
@@ -360,7 +365,7 @@ geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data
   scale_y_log10()+
   theme(legend.position = c(0.17, 0.17),
         legend.key.size = unit(0.4, 'cm'))+
-  labs(x = "k", y = "CCDF")
+  labs(x = "k", y = "MIK Estimation")
 pl_best_k
 
 ggsave(pl_best_k, height = 3, width = 5, file = "plot_best_k.pdf")
@@ -396,9 +401,9 @@ get_data_best_k_weib <- function(p_test){
   return(data_test_k)
 }
 
-data_plot_k_6 <- get_data_best_k_weib(1-1e-6)
-data_plot_k_9 <- get_data_best_k_weib(1-1e-9)
-data_plot_k_12 <- get_data_best_k_weib(1-1e-12)
+data_plot_k_6 <- get_data_best_k_weib(1-1e-9)
+data_plot_k_9 <- get_data_best_k_weib(1-1e-12)
+data_plot_k_12 <- get_data_best_k_weib(1-1e-15)
 #qnorm(p_test, mean = mean1, sd = sd1)
 
 get_min_k <- function(data_plot){
@@ -420,21 +425,21 @@ data_plot_best_k_12 <- tibble(y = data_plot_k_12, x = ks[1:length(data_plot_k_12
 
 
 viridis_colors <- viridis::viridis(4)
-colors <- c("1e-6" = viridis_colors[3], 
-            "1e-9" = viridis_colors[1],
-            "1e-12" = viridis_colors[2])
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[1],
+            "1e-15" = viridis_colors[2])
 
 labels <- factor(c("1e-06","1e-09","1e-12"), levels = c("1e-6","1e-9","1e-12"))
-colors <- c("1e-06" = viridis_colors[3], 
-            "1e-09" = viridis_colors[2],
-            "1e-12" = viridis_colors[1])
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[2],
+            "1e-15" = viridis_colors[1])
 
 pl_best_k_weib <- ggplot()+
-  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-06"))+
-  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-09"))+
-  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-09"))+
+  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-15"))+
   geom_label_repel(data          = subset(data_plot_best_k_6, x == get_min_k(data_plot_best_k_6) ),
-                   aes(x = x, y = y, color = "1e-06", label = label),
+                   aes(x = x, y = y, color = "1e-09", label = label),
                    show.legend = FALSE,
                    size          = 4,
                    vjust = 1,
@@ -443,21 +448,9 @@ pl_best_k_weib <- ggplot()+
                    point.padding = 0.5,
                    force         = 100,
                    segment.size  = 0.2,
-                   segment.color = "1e-06",
-                   direction     = "y")+
-  geom_label_repel(data          = subset(data_plot_best_k_9, x == get_min_k(data_plot_best_k_9) ),
-                   aes(x = x, y = y, color = "1e-09", label = label),
-                   show.legend = FALSE,
-                   size          = 4,
-                   vjust = 1,
-                   nudge_x = 3,
-                   box.padding   = 0.1,
-                   point.padding = 0.5,
-                   force         = 100,
-                   segment.size  = 0.2,
                    segment.color = "1e-09",
                    direction     = "y")+
-  geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data_plot_best_k_12) ),
+  geom_label_repel(data          = subset(data_plot_best_k_9, x == get_min_k(data_plot_best_k_9) ),
                    aes(x = x, y = y, color = "1e-12", label = label),
                    show.legend = FALSE,
                    size          = 4,
@@ -465,9 +458,21 @@ pl_best_k_weib <- ggplot()+
                    nudge_x = 3,
                    box.padding   = 0.1,
                    point.padding = 0.5,
-                   force         = 100,
+                   force         = 75,
                    segment.size  = 0.2,
                    segment.color = "1e-12",
+                   direction     = "y")+
+  geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data_plot_best_k_12) ),
+                   aes(x = x, y = y, color = "1e-15", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   nudge_x = 3,
+                   box.padding   = 0.1,
+                   point.padding = 0.5,
+                   force         = 75,
+                   segment.size  = 0.2,
+                   segment.color = "1e-15",
                    direction     = "y")+
   scale_color_manual(values = colors)+
   labs(
@@ -477,7 +482,7 @@ pl_best_k_weib <- ggplot()+
   scale_y_log10()+
   theme(legend.position = c(0.16, 0.17),
         legend.key.size = unit(0.4, 'cm'))+
-  labs(x = "k", y = "CCDF")
+  labs(x = "k", y = "MIK Estimation")
 pl_best_k_weib
 
 ggsave(pl_best_k, height = 3, width = 5, file = "plot_best_k.pdf")
@@ -487,24 +492,19 @@ ggsave(ggarrange(pl_best_k , pl_best_k_weib), width = 6, height = 3, file = "mar
 
 
 
-# Make mixture
+# Make gaussian
 mean1 <- 100
-mean2 <- 50
-mean3 <- 100
 sd1 <- 10
-sd2 <- 20
-sd3 <- 30
-
 
 
 x_seq <- seq(from = 1,  to = 600, length.out = 1000)
-mixture_ccdf <- c()
+uni_ccdf <- c()
 for (x in x_seq){
-  mixture_ccdf <- c(mixture_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
+  mixture_ccdf <- c(uni_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
 }
 
 ks <- seq(from = 1, to = 100, by = 5)
-plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
 for (k in ks){
   e_k <- tail(gaussian_expected_value_k(k + 1, mean1, sd1), n = 1)
   cota_k <-  as.tibble(e_k / x_seq^(k))
@@ -512,6 +512,7 @@ for (k in ks){
   plot_data <- cbind(plot_data, cota_k)
   #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
 }
+
 
 viridis_colors <- viridis::viridis(4)
 colors <- c("Gaussian" ="#00000F", 
@@ -565,23 +566,25 @@ for (x in x_seq){
 }
 
 ks <- seq(from = 1, to = 100, by = 5)
-plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+memik_data <- tibble(theo =  uni_ccdf, x = x_seq)
 for (k in ks){
   e_k <- weibull_k_moment(k = k, shape = 1/shape, scale = scale)
   cota_k <-  as.tibble(e_k / x_seq^(k))
   colnames(cota_k) <- paste0("k", k)
-  plot_data <- cbind(plot_data, cota_k)
-  #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
+  memik_data <- cbind(plot_data, cota_k)
+  
 }
+
+
+countour <- memik_data[, -c(1:2)] %>% 
+  t() %>% 
+  apply(2,min)
+
 
 viridis_colors <- viridis::viridis(4)
 colors <- c("Gaussian" ="#00000F", 
             "Markov" = viridis_colors[3])
 
-
-countour <- plot_data[, -c(1:2)] %>% 
-  t() %>% 
-  apply(2,min)
 
 countour_data <- cbind(plot_data[, c(1:2)], countour)
 
