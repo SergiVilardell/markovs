@@ -270,9 +270,9 @@ library(CharFun)
 mean1 <- 5
 mean2 <- 50
 mean3 <- 100
-sd1 <- 10
-sd2 <- 10
-sd3 <- 10
+sd1 <- 5
+sd2 <- 5
+sd3 <- 5
 
 x_seq <- seq(1, 170, 1)
 mixture_density <- c()
@@ -290,15 +290,16 @@ for (x in x_seq) {
       0.001 * pnorm(x, mean = mean3, sd = sd3)
   ))
 }
+plot(x_seq, mixture_ccdf, log = "y")
 
 plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
 
 p_test <- 1-1e-12
-x_test <- 160
+x_test <- 163
 
 iter <- 1
 data_test_k <- c()
-ks <- seq(from = 5, to = 200, by = 1)
+ks <- seq(from = 1, to = 1, by = 1)
 iter <- 1
 for (k in ks){
   e_k <- 0.6 * (tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1) )/(1-pnorm(0, mean = mean1, sd = sd1)) + 
@@ -320,3 +321,62 @@ contour_quantile <-  (0.6 * (tail(gaussian_expected_value_k(best_k+1, mean1, sd1
                         0.001 * (tail(gaussian_expected_value_k(best_k+1, mean3, sd3), n = 1))/(1-pnorm(0, mean = mean3, sd = sd3)))^(1/best_k) / ((1-p_test)^(1/best_k))
 x_test
 contour_quantile/x_test
+
+
+
+# Rev weibull -------------------------------------------------------------
+
+source("scripts/markov_functions.R")
+library(CharFun)
+# Make mixture
+scale1 <- 5
+scale2 <- 50
+scale3 <- 100
+shape1 <- 4
+shape2 <- 4
+shape3 <- 4
+weights <- c(0.6, 0.399, 0.001)
+# Range of mixture
+x_seq <- seq(0, 250, length.out = 10000)
+
+# COmpute mixture ccdf
+mixture_ccdf <- c()
+for (x in x_seq) {
+  mixture_ccdf <- c(mixture_ccdf, (
+    weights[1] * pweibull(x, shape = shape1, scale = scale1) +
+      weights[2] * pweibull(x, shape = shape2, scale = scale2) +
+      weights[3] * pweibull(x, shape = shape3, scale = scale3)
+  ))
+}
+plot(x_seq, 1-mixture_ccdf, log = "y")
+x_rweib <- -x_seq +max(x_seq)
+plot_data <- tibble(theo =  1-mixture_ccdf, x = x_seq)
+
+p_test <- 1-1e-12
+x_test <- 213
+
+iter <- 1
+data_test_k <- c()
+ks <- seq(from = 1, to =1, by = 1)
+iter <- 1
+for (k in ks){
+  e_k <- 0.6 * weibull_k_moment(k = k, scale = scale1, shape = shape1)+ 
+    0.399 * weibull_k_moment(k = k, scale = scale2, shape = shape2) +
+    0.001 * weibull_k_moment(k = k, scale = scale3, shape = shape3)
+  cota_k <-  e_k / (x_test)^(k)
+  data_test_k[iter] <- cota_k
+  iter <- iter + 1
+}
+
+
+data_test_k <- na.omit(data_test_k)
+data_test_k <- data_test_k[data_test_k!=0]
+data_test_k <- data_test_k[data_test_k!=Inf]
+index_min_k <- which(data_test_k==min(data_test_k))
+best_k <- ks[index_min_k]
+contour_quantile <-  (0.6 * weibull_k_moment(k = best_k, scale = scale1, shape = shape1) + 
+                        0.399 * weibull_k_moment(k = best_k, scale = scale2, shape = shape2) + 
+                        0.001 * weibull_k_moment(k = best_k, scale = scale3, shape = shape3))^(1/best_k) / ((1-p_test)^(1/best_k))
+x_test
+contour_quantile/x_test
+

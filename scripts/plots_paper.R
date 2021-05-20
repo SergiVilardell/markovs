@@ -67,7 +67,7 @@ p_gauss <- plot_data %>%
   guides(color = guide_legend(reverse = TRUE))+
   labs(x = "Time", y = "CCDF")
 p_gauss
-ggsave(p, width = 3, height = 3, file = "markov_gaussian.pdf") 
+ggsave(p_gauss, width = 3, height = 3, file = "markov_gaussian.pdf") 
 
 
 # Weibull Markov ----------------------------------------------------------
@@ -113,7 +113,121 @@ p_weib <- plot_data %>%
   labs(x = "Time", y = "CCDF")
 p_weib
 
+ggsave(p_weib, width = 3, height = 3, file = "markov_weibull.pdf")
 
+# Beta Markov -------------------------------------------------------------
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+# kth moment of the weibull distribution
+beta_k_moment <- function(k, sh1, sh2){
+  ev_k <- c()
+  ev_k[1] <- sh1/(sh1 + sh2)
+  if(k > 1){
+    for(i in 2:k){
+      ev_k[i] <- ev_k[i - 1]*(sh1 + i - 1)/(sh1 + sh2 + i - 1)
+    }
+  }
+  return(tail(ev_k, n = 1))
+}
+
+x_seq <- seq(from = 0, to = 1, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pbeta(x, shape1 = shape1, shape2 = shape2))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+ks <- seq(from = 1, to = 1, by = 1)
+for (k in ks){
+  e_k <- beta_k_moment(k = k, sh1 = shape1, sh2 = shape2)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+viridis_colors <- viridis::viridis(4)
+colors <- c("Beta" ="#00000F", 
+            "Markov" = viridis_colors[3])
+
+p_beta <- plot_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = theo, color = "Beta"))+
+  geom_line(aes(x = x, y = k1, color = "Markov"))+
+  scale_y_log10(limits = c(1e-8,2))+
+  scale_color_manual(values =  colors,
+                     name= "")+
+  theme(legend.position = c(0.4, 0.4))+
+  guides(color = guide_legend(reverse = TRUE))+
+  labs(x = "Time", y = "CCDF")
+p_beta
+
+ggsave(p_beta, width = 3, height = 3, file = "markov_beta.pdf")
+# Gaussian mixture Markov -------------------------------------------------
+source("scripts/markov_functions.R")
+library(CharFun)
+# Make mixture
+mean1 <- 5
+mean2 <- 50
+mean3 <- 100
+sd1 <- 10
+sd2 <- 10
+sd3 <- 10
+
+x_seq <- seq(1, 170, 1)
+mixture_density <- c()
+mixture_ccdf <- c()
+for (x in x_seq) {
+  mixture_density <- c(
+    mixture_density,
+    0.6 * dnorm(x, mean = mean1, sd = sd1) +
+      0.399 * dnorm(x, mean = mean2, sd = sd2) +
+      0.001 * dnorm(x, mean = mean3, sd = sd3)
+  )
+  mixture_ccdf <- c(mixture_ccdf, 1 - (
+    0.6 * pnorm(x, mean = mean1, sd = sd1) +
+      0.399 * pnorm(x, mean = mean2, sd = sd2) +
+      0.001 * pnorm(x, mean = mean3, sd = sd3)
+  ))
+}
+
+plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
+ks <- seq(from = 1, to = 1, by = 1)
+for (k in ks){
+  e_k <- 0.6 *  mean1 + 
+    0.399 * mean2+ 
+    0.001 * mean3
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+  
+}
+
+viridis_colors <- viridis::viridis(4)
+colors <- c("Gaussian Mixture" ="#00000F", 
+            "Markov" = viridis_colors[3])
+
+p_mix <- plot_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = theo, color = "Gaussian Mixture"))+
+  geom_line(aes(x = x, y = k1, color = "Markov"))+
+  scale_y_log10(limits = c(1e-8,2))+
+  scale_color_manual(values =  colors,
+                     name= "")+
+  theme(legend.position = c(0.4, 0.4))+
+  guides(color = guide_legend(reverse = TRUE))+
+  labs(x = "Time", y = "CCDF")
+p_mix
+
+ggsave(p_mix, width = 3, height = 3, file = "markov_mixture.pdf")
+
+
+ggsave(ggarrange(p_mix ,p_beta), width = 6, height = 3, file = "markov_mix_beta.pdf")
 # Gumbel Markov -----------------------------------------------------------
 
 
@@ -178,12 +292,11 @@ for (x in x_seq){
   mixture_ccdf <- c(mixture_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
 }
 
-ks <- c(10, 50, 90)
+ks <- c(10, 15, 25, 50)
 plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
 for (k in ks){
   e_k <- tail(gaussian_expected_value_k(k + 1, mean1, sd1), n = 1)
   cota_k <-  as.tibble(e_k / x_seq^(k))
-  color_k <- rep(colors_palette[k], nrow(cota_k))
   colnames(cota_k) <- paste0("k", k)
   plot_data <- cbind(plot_data, cota_k)
   #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
@@ -191,22 +304,26 @@ for (k in ks){
 
 melted_plot_data <- melt(plot_data, id.vars = "x")
 
-p <- melted_plot_data %>% 
+p_gauss <- melted_plot_data %>% 
   ggplot()+
   geom_line(aes(x = x, y = value, color = variable))+
   scale_y_log10(limits = c(1e-8,10))+
   xlim(c(0,300))+
-  scale_color_manual(values = c("black", "red", "darkviolet", "blue"), 
+  scale_color_manual(values = c("black",viridis::viridis(5)[1:4]), 
                      name= "",
-                     labels = c("Gaussian","k = 10","k = 50","k = 90"))+
-  scale_size_manual(values = c(1, 1, 1, 1), guide = FALSE)+
+                     labels = c("Gaussian",
+                                "k = 10",
+                                "k = 15",
+                                "k = 25",
+                                "k = 50"))+
+  scale_size_manual(values = c(1, 1.5, 1.5, 1.5), guide = FALSE)+
   theme(legend.position = c(0.25, 0.3),
         legend.key.size = unit(0.4, 'cm'))+
   labs(x = "Time", y = "CCDF")
-p
+p_gauss
 
+ggsave(p_gauss, width = 3, height = 3, file = "markov_gauss_multik.pdf") 
 #Weibull
-
 
 # Make mixture
 location <- 40000
@@ -226,7 +343,7 @@ for (x in x_seq){
 plot(x_seq, uni_ccdf, log = "y")
 
 plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
-ks <- c(10,50,90)
+ks <- c(10,15, 25, 50)
 for (k in ks){
   e_k <- weibull_k_moment(k = k, shape = 1/shape, scale = scale)
   cota_k <-  as.tibble(e_k / (x_seq)^(k))
@@ -238,21 +355,140 @@ melted_plot_data <- melt(plot_data, id.vars = "x")
 
 p_weib <- melted_plot_data %>% 
   ggplot()+
-  geom_line(aes(x = x, y = value, color = variable, size = variable))+
+  geom_line(aes(x = x, y = value, color = variable))+
   scale_y_log10(limits = c(1e-8,10))+
   xlim(c(0,300))+
-  scale_color_manual(values = c("black", "red", "darkviolet", "blue"), 
+  scale_color_manual(values = c("black",viridis::viridis(5)[1:4]), 
                      name= "",
-                     labels = c("Weibull","k = 10","k = 50","k = 90"))+
-  scale_size_manual(values = c(1, 1, 1, 1), guide = FALSE)+
-  theme(legend.position = c(0.4, 0.3),
+                     labels = c("Weibull",
+                                "k = 10",
+                                "k = 15",
+                                "k = 25",
+                                "k = 50"))+
+  scale_size_manual(values = c(1, 1.5, 1.5, 1.5), guide = FALSE)+
+  theme(legend.position = c(0.25, 0.3),
         legend.key.size = unit(0.4, 'cm'))+
   labs(x = "Time", y = "CCDF")
 p_weib
 
-ggsave(p, width = 5, height = 3, file = "markov_gaussian_multik_example.pdf") 
+ggsave(p_weib, width = 3, height = 3, file = "markov_weibull_multik.pdf") 
 
-ggsave(ggarrange(p , p_weib), width = 6, height = 3, file = "markov_comb_K3.pdf")
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+# kth moment of the weibull distribution
+beta_k_moment <- function(k, sh1, sh2){
+  ev_k <- c()
+  ev_k[1] <- sh1/(sh1 + sh2)
+  if(k > 1){
+    for(i in 2:k){
+      ev_k[i] <- ev_k[i - 1]*(sh1 + i - 1)/(sh1 + sh2 + i - 1)
+    }
+  }
+  return(tail(ev_k, n = 1))
+}
+
+x_seq <- seq(from = 0, to = 1, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pbeta(x, shape1 = shape1, shape2 = shape2))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+ks <- c(10,15, 25, 50)
+for (k in ks){
+  e_k <- beta_k_moment(k = k, sh1 = shape1, sh2 = shape2)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+viridis_colors <- viridis::viridis(4)
+colors <- c("Beta" ="#00000F", 
+            "Markov" = viridis_colors[3])
+
+
+melted_plot_data <- melt(plot_data, id.vars = "x")
+p_beta <- melted_plot_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = value, color = variable))+
+  scale_y_log10(limits = c(1e-8,10))+
+  scale_color_manual(values = c("black",viridis::viridis(5)[1:4]), 
+                     name= "",
+                     labels = c("Beta",
+                                "k = 10",
+                                "k = 15",
+                                "k = 25",
+                                "k = 50"))+
+  scale_size_manual(values = c(1, 1.5, 1.5, 1.5), guide = FALSE)+
+  theme(legend.position = c(0.25, 0.3),
+        legend.key.size = unit(0.4, 'cm'))+
+  labs(x = "Time", y = "CCDF")
+p_beta
+
+ggsave(p_beta, width = 3, height = 3, file = "markov_beta_multik.pdf") 
+
+# Make mixture
+mean1 <- 5
+mean2 <- 50
+mean3 <- 100
+sd1 <- 10
+sd2 <- 10
+sd3 <- 10
+
+x_seq <- seq(1, 170, 1)
+mixture_density <- c()
+mixture_ccdf <- c()
+for (x in x_seq) {
+  mixture_density <- c(
+    mixture_density,
+    0.6 * dnorm(x, mean = mean1, sd = sd1) +
+      0.399 * dnorm(x, mean = mean2, sd = sd2) +
+      0.001 * dnorm(x, mean = mean3, sd = sd3)
+  )
+  mixture_ccdf <- c(mixture_ccdf, 1 - (
+    0.6 * pnorm(x, mean = mean1, sd = sd1) +
+      0.399 * pnorm(x, mean = mean2, sd = sd2) +
+      0.001 * pnorm(x, mean = mean3, sd = sd3)
+  ))
+}
+
+plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
+ks <- c(10,15, 25, 50)
+for (k in ks){
+  e_k <- 0.6 * (tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1) )/(1-pnorm(0, mean = mean1, sd = sd1)) + 
+    0.399 * (tail(gaussian_expected_value_k(k+1,mean2, sd2), n = 1))/(1-pnorm(0, mean = mean2, sd = sd2)) + 
+    0.001 * (tail(gaussian_expected_value_k(k+1, mean3, sd3), n = 1))/(1-pnorm(0, mean = mean3, sd = sd3))
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+  
+}
+viridis_colors <- viridis::viridis(4)
+colors <- c("Gaussian Mixture" ="#00000F", 
+            "Markov" = viridis_colors[3])
+melted_plot_data <- melt(plot_data, id.vars = "x")
+p_mix <- melted_plot_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = value, color = variable))+
+  scale_y_log10(limits = c(1e-8,10))+
+  scale_color_manual(values = c("black",viridis::viridis(5)[1:4]), 
+                     name= "",
+                     labels = c("Gaussian Mixture",
+                                "k = 10",
+                                "k = 15",
+                                "k = 25",
+                                "k = 50"))+
+  scale_size_manual(values = c(1, 1.5, 1.5, 1.5), guide = FALSE)+
+  theme(legend.position = c(0.3, 0.3),
+        legend.key.size = unit(0.4, 'cm'))+
+  labs(x = "Time", y = "CCDF")
+p_mix
+ggsave(p_mix, width = 3, height = 3, file = "markov_mixture_multik.pdf")
 
 
 
@@ -360,15 +596,15 @@ geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data
   scale_color_manual(values = colors)+
   labs(
     y = "",
-    color = "Gaussian"
+    color = "Target\nProbability"
   ) +
   scale_y_log10()+
-  theme(legend.position = c(0.17, 0.17),
+  theme(legend.position = c(0.22, 0.22),
         legend.key.size = unit(0.4, 'cm'))+
-  labs(x = "k", y = "MIK Estimation")
+  labs(x = "k", y = "Estimated Probability")
 pl_best_k
 
-ggsave(pl_best_k, height = 3, width = 5, file = "plot_best_k.pdf")
+ggsave(pl_best_k, height = 3, width = 3, file = "plot_gauss_best_k.pdf")
 
 
 # Get best k Weibull ------------------------------------------------------
@@ -477,16 +713,273 @@ pl_best_k_weib <- ggplot()+
   scale_color_manual(values = colors)+
   labs(
     y = "",
-    color = "Weibull"
+    color = "Target\nProbability"
   ) +
   scale_y_log10()+
-  theme(legend.position = c(0.16, 0.17),
+  theme(legend.position = c(0.22, 0.2),
         legend.key.size = unit(0.4, 'cm'))+
-  labs(x = "k", y = "MIK Estimation")
+  labs(x = "k", y = "Estimated Probability")
 pl_best_k_weib
 
-ggsave(pl_best_k, height = 3, width = 5, file = "plot_best_k.pdf")
-ggsave(ggarrange(pl_best_k , pl_best_k_weib), width = 6, height = 3, file = "markov_best_K_wg.pdf")
+ggsave(pl_best_k_weib, height = 3, width = 3, file = "plot_weib_best_k.pdf")
+ggsave(ggarrange(pl_best_k , pl_best_k_weib), width = 6, height = 3, file = "markov_best_K_wg_2.pdf")
+
+
+# Get best k Beta ---------------------------------------------------------
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+# kth moment of the weibull distribution
+beta_k_moment <- function(k, sh1, sh2){
+  ev_k <- c()
+  ev_k[1] <- sh1/(sh1 + sh2)
+  if(k > 1){
+    for(i in 2:k){
+      ev_k[i] <- ev_k[i - 1]*(sh1 + i - 1)/(sh1 + sh2 + i - 1)
+    }
+  }
+  return(tail(ev_k, n = 1))
+}
+
+ks <- seq(from = 5, to = 200, by = 2)
+get_data_best_k <- function(p_test){
+  x_test <- qbeta(p_test, shape1 = shape1, shape2 = shape2)
+  ks <- seq(from = 5, to = 200, by = 2)
+  iter <- 1
+  data_test_k <- c()
+  for (k in ks){
+    e_k <- beta_k_moment(k, shape1, shape2)
+    cota_k <-  e_k / x_test^(k)
+    names(cota_k) <- paste0("k", k)
+    data_test_k[iter] <- cota_k
+    iter <- iter + 1
+    #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
+  }
+  
+  data_test_k <- na.omit(data_test_k)
+  data_test_k <- data_test_k[data_test_k!=0]
+  data_test_k <- data_test_k[data_test_k!=Inf]
+  index_min_k <- which(data_test_k==min(data_test_k))
+  return(data_test_k)
+}
+
+data_test_k_6 <- get_data_best_k(1-1e-9)
+data_test_k_9 <- get_data_best_k(1-1e-12)
+data_test_k_12 <- get_data_best_k(1-1e-15)
+
+get_min_k <- function(data_plot){
+  index_min_k <- which(data_plot==min(data_plot))
+  ks[index_min_k]
+}
+
+
+data_plot_best_k_6 <- tibble(y = data_test_k_6, x = ks[1:length(data_test_k_6)], label = rep(get_min_k(data_test_k_6),
+                                                                                             length(data_test_k_6)))
+data_plot_best_k_9 <- tibble(y = data_test_k_9, x = ks[1:length(data_test_k_9)],label = rep(get_min_k(data_test_k_9),
+                                                                                            length(data_test_k_9)))
+data_plot_best_k_12 <- tibble(y = data_test_k_12, x = ks[1:length(data_test_k_12)],label = rep(get_min_k(data_test_k_12),
+                                                                                               length(data_test_k_12)))
+
+
+
+
+viridis_colors <- viridis::viridis(4)
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[1],
+            "1e-15" = viridis_colors[2])
+
+labels <- factor(c("1e-06","1e-09","1e-12"), levels = c("1e-6","1e-9","1e-12"))
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[2],
+            "1e-15" = viridis_colors[1])
+pl_best_k <-  ggplot()+
+  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-09"))+
+  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-15"))+
+  geom_label_repel(data          = subset(data_plot_best_k_6, x == get_min_k(data_plot_best_k_6) ),
+                   aes(x = x, y = y, color = "1e-09", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   box.padding   = 0.1,
+                   nudge_x = 2,
+                   point.padding = 0.5,
+                   force         = 100,
+                   segment.size  = 0.2,
+                   segment.color = "1e-09",
+                   direction     = "y")+
+  geom_label_repel(data          = subset(data_plot_best_k_9, x == get_min_k(data_plot_best_k_9) ),
+                   aes(x = x, y = y, color = "1e-12", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   nudge_x = 3,
+                   box.padding   = 0.1,
+                   point.padding = 0.5,
+                   force         = 75,
+                   segment.size  = 0.2,
+                   segment.color = "1e-12",
+                   direction     = "y")+
+  geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data_plot_best_k_12) ),
+                   aes(x = x, y = y, color = "1e-15", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   nudge_x = 3,
+                   box.padding   = 0.1,
+                   point.padding = 0.5,
+                   force         = 65,
+                   segment.size  = 0.2,
+                   segment.color = "1e-15",
+                   direction     = "y")+
+  scale_color_manual(values = colors)+
+  labs(
+    y = "",
+    color = "Target\nProbability"
+  ) +
+  scale_y_log10()+
+  theme(legend.position = c(0.22, 0.15),
+        legend.key.size = unit(0.3, 'cm'))+
+  labs(x = "k", y = "Estimated Probability")
+pl_best_k
+
+ggsave(pl_best_k, height = 3, width = 3, file = "plot_beta_best_k.pdf")
+
+
+# Get best k Mixture ---------------------------------------------------------
+
+# Make mixture
+mean1 <- 5
+mean2 <- 50
+mean3 <- 100
+sd1 <- 10
+sd2 <- 10
+sd3 <- 10
+
+x_seq <- seq(1, 190, 1)
+mixture_density <- c()
+mixture_ccdf <- c()
+for (x in x_seq) {
+  mixture_density <- c(
+    mixture_density,
+    0.6 * dnorm(x, mean = mean1, sd = sd1) +
+      0.399 * dnorm(x, mean = mean2, sd = sd2) +
+      0.001 * dnorm(x, mean = mean3, sd = sd3)
+  )
+  mixture_ccdf <- c(mixture_ccdf, 1 - (
+    0.6 * pnorm(x, mean = mean1, sd = sd1) +
+      0.399 * pnorm(x, mean = mean2, sd = sd2) +
+      0.001 * pnorm(x, mean = mean3, sd = sd3)
+  ))
+}
+
+ks <- seq(from = 5, to = 200, by = 2)
+get_data_mix_best_k <- function(p_test, x_test){
+  ks <- seq(from = 5, to = 200, by = 2)
+  iter <- 1
+  data_test_k <- c()
+  for (k in ks){
+    e_k <-   e_k <- 0.6 * (tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1) )/(1-pnorm(0, mean = mean1, sd = sd1)) + 
+      0.399 * (tail(gaussian_expected_value_k(k+1,mean2, sd2), n = 1))/(1-pnorm(0, mean = mean2, sd = sd2)) + 
+      0.001 * (tail(gaussian_expected_value_k(k+1, mean3, sd3), n = 1))/(1-pnorm(0, mean = mean3, sd = sd3))
+    cota_k <-  e_k / x_test^(k)
+    names(cota_k) <- paste0("k", k)
+    data_test_k[iter] <- cota_k
+    iter <- iter + 1
+    #lines(x_seq, cota_k, col = colors_palette[k], lwd = 2)
+  }
+  
+  data_test_k <- na.omit(data_test_k)
+  data_test_k <- data_test_k[data_test_k!=0]
+  data_test_k <- data_test_k[data_test_k!=Inf]
+  index_min_k <- which(data_test_k==min(data_test_k))
+  return(data_test_k)
+}
+
+data_test_k_6 <- get_data_mix_best_k (1-1e-9,159)
+data_test_k_9 <- get_data_mix_best_k (1-1e-12,169)
+data_test_k_12 <- get_data_mix_best_k (1-1e-15,178)
+
+get_min_k <- function(data_plot){
+  index_min_k <- which(data_plot==min(data_plot))
+  ks[index_min_k]
+}
+
+
+data_plot_best_k_6 <- tibble(y = data_test_k_6, x = ks[1:length(data_test_k_6)], label = rep(get_min_k(data_test_k_6),
+                                                                                             length(data_test_k_6)))
+data_plot_best_k_9 <- tibble(y = data_test_k_9, x = ks[1:length(data_test_k_9)],label = rep(get_min_k(data_test_k_9),
+                                                                                            length(data_test_k_9)))
+data_plot_best_k_12 <- tibble(y = data_test_k_12, x = ks[1:length(data_test_k_12)],label = rep(get_min_k(data_test_k_12),
+                                                                                               length(data_test_k_12)))
+
+
+
+
+viridis_colors <- viridis::viridis(4)
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[1],
+            "1e-15" = viridis_colors[2])
+
+labels <- factor(c("1e-06","1e-09","1e-12"), levels = c("1e-6","1e-9","1e-12"))
+colors <- c("1e-09" = viridis_colors[3], 
+            "1e-12" = viridis_colors[2],
+            "1e-15" = viridis_colors[1])
+pl_best_k <-  ggplot()+
+  geom_point(data= data_plot_best_k_6,aes(x = x, y = y, color = "1e-09"))+
+  geom_point(data= data_plot_best_k_9,aes(x = x, y = y,color = "1e-12"))+
+  geom_point(data= data_plot_best_k_12,aes(x = x, y = y,color = "1e-15"))+
+  geom_label_repel(data          = subset(data_plot_best_k_6, x == get_min_k(data_plot_best_k_6) ),
+                   aes(x = x, y = y, color = "1e-09", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   box.padding   = 0.1,
+                   nudge_x = 2,
+                   point.padding = 0.5,
+                   force         = 100,
+                   segment.size  = 0.2,
+                   segment.color = "1e-09",
+                   direction     = "y")+
+  geom_label_repel(data          = subset(data_plot_best_k_9, x == get_min_k(data_plot_best_k_9) ),
+                   aes(x = x, y = y, color = "1e-12", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   nudge_x = 3,
+                   box.padding   = 0.1,
+                   point.padding = 0.5,
+                   force         = 75,
+                   segment.size  = 0.2,
+                   segment.color = "1e-12",
+                   direction     = "y")+
+  geom_label_repel(data          = subset(data_plot_best_k_12, x == get_min_k(data_plot_best_k_12) ),
+                   aes(x = x, y = y, color = "1e-15", label = label),
+                   show.legend = FALSE,
+                   size          = 4,
+                   vjust = 1,
+                   nudge_x = 3,
+                   box.padding   = 0.1,
+                   point.padding = 0.5,
+                   force         = 65,
+                   segment.size  = 0.2,
+                   segment.color = "1e-15",
+                   direction     = "y")+
+  scale_color_manual(values = colors)+
+  labs(
+    y = "",
+    color = "Target\nProbability"
+  ) +
+  scale_y_log10()+
+  theme(legend.position = c(0.22, 0.22),
+        legend.key.size = unit(0.4, 'cm'))+
+  labs(x = "k", y = "Estimated Probability")
+pl_best_k
+
+ggsave(pl_best_k, height = 3, width = 3, file = "plot_mix_best_k.pdf")
 
 # Contour Gaussian ---------------------------------------------------------
 
@@ -500,7 +993,7 @@ sd1 <- 10
 x_seq <- seq(from = 1,  to = 600, length.out = 1000)
 uni_ccdf <- c()
 for (x in x_seq){
-  mixture_ccdf <- c(uni_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
+  uni_ccdf <- c(uni_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
 }
 
 ks <- seq(from = 1, to = 100, by = 5)
@@ -514,10 +1007,6 @@ for (k in ks){
 }
 
 
-viridis_colors <- viridis::viridis(4)
-colors <- c("Gaussian" ="#00000F", 
-            "Markov" = viridis_colors[3])
-
 
 countour <- plot_data[, -c(1:2)] %>% 
   t() %>% 
@@ -525,13 +1014,14 @@ countour <- plot_data[, -c(1:2)] %>%
 
 countour_data <- cbind(plot_data[, c(1:2)], countour)
 
-
-colors <- c("MEMIK" = "#00cfc4", "Gaussian" = "#000000")
+viridis_colors <- viridis::viridis(4)
+colors <- c("Gaussian" ="#00000F", 
+            "MEMIK" = viridis_colors[3])
 pl <- countour_data %>% 
   ggplot()+
   geom_line(aes(x = x, y = countour, color = "MEMIK"), size = 1.5)+
   geom_line(aes(x = x, y = theo, color = "Gaussian"))+
-  scale_y_log10(limits = c(1e-8,10))+
+  scale_y_log10(limits = c(1e-15,10))+
   xlim(c(0,300))+
   scale_color_manual(values = colors)+
   labs(
@@ -544,7 +1034,7 @@ pl <- countour_data %>%
   theme(legend.position = c(0.8, 0.8))+
   labs(x = "Time", y = "CCDF")
 pl 
-ggsave(pl, width = 5, height = 3, file = "markov_gaussian_contour.pdf") 
+ggsave(pl, width = 3, height = 3, file = "markov_gaussian_contour.pdf") 
 
 
 # Contour Weibull ---------------------------------------------------------
@@ -552,7 +1042,7 @@ ggsave(pl, width = 5, height = 3, file = "markov_gaussian_contour.pdf")
 # Make mixture
 location <- 40000
 scale <- 100
-shape <- 1/4
+shape <- 4
 
 # kth moment of the weibull distribution
 weibull_k_moment <- function(k, scale, shape){
@@ -562,17 +1052,16 @@ weibull_k_moment <- function(k, scale, shape){
 x_seq <- seq(from = 0, to = 600, length.out = 500)
 uni_ccdf <- c()
 for (x in x_seq){
-  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = 1/shape, scale = scale))
+  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = shape, scale = scale))
 }
 
 ks <- seq(from = 1, to = 100, by = 5)
 memik_data <- tibble(theo =  uni_ccdf, x = x_seq)
 for (k in ks){
-  e_k <- weibull_k_moment(k = k, shape = 1/shape, scale = scale)
+  e_k <- weibull_k_moment(k = k, shape = shape, scale = scale)
   cota_k <-  as.tibble(e_k / x_seq^(k))
   colnames(cota_k) <- paste0("k", k)
-  memik_data <- cbind(plot_data, cota_k)
-  
+  memik_data <- cbind(memik_data, cota_k)
 }
 
 
@@ -581,20 +1070,16 @@ countour <- memik_data[, -c(1:2)] %>%
   apply(2,min)
 
 
-viridis_colors <- viridis::viridis(4)
-colors <- c("Gaussian" ="#00000F", 
-            "Markov" = viridis_colors[3])
+countour_data <- cbind(memik_data[, c(1:2)], countour)
 
+colors <- c("Weibull" ="#00000F", 
+            "MEMIK" = viridis_colors[3])
 
-countour_data <- cbind(plot_data[, c(1:2)], countour)
-
-
-colors <- c("MEMIK" = "#00cfc4", "Weibull" = "#000000")
 pl_weib <- countour_data %>% 
   ggplot()+
   geom_line(aes(x = x, y = countour, color = "MEMIK"), size = 1.5)+
   geom_line(aes(x = x, y = theo, color = "Weibull"))+
-  scale_y_log10(limits = c(1e-8,10))+
+  scale_y_log10(limits = c(1e-15,10))+
   xlim(c(0,300))+
   scale_color_manual(values = colors)+
   labs(
@@ -607,8 +1092,156 @@ pl_weib <- countour_data %>%
   theme(legend.position = c(0.8, 0.8))+
   labs(x = "Time", y = "CCDF")
 pl_weib 
-ggsave(pl, width = 5, height = 3, file = "markov_gaussian_contour.pdf") 
-ggsave(ggarrange(pl , pl_weib), width = 6, height = 3, file = "markov_memik.pdf")
+
+ggsave(pl_weib, width = 3, height = 3, file = "markov_weibull_contour.pdf") 
+
+
+# Contour Beta ------------------------------------------------------------
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+# kth moment of the weibull distribution
+beta_k_moment <- function(k, sh1, sh2){
+  ev_k <- c()
+  ev_k[1] <- sh1/(sh1 + sh2)
+  if(k > 1){
+    for(i in 2:k){
+      ev_k[i] <- ev_k[i - 1]*(sh1 + i - 1)/(sh1 + sh2 + i - 1)
+    }
+  }
+  return(tail(ev_k, n = 1))
+}
+
+x_seq <- seq(from = 0, to = 1, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pbeta(x, shape1 = shape1, shape2 = shape2))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+
+ks <- seq(from = 1, to = 200, by = 5)
+for (k in ks){
+  e_k <- beta_k_moment(k = k, sh1 = shape1, sh2 = shape2)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+
+
+countour <- plot_data[, -c(1:2)] %>% 
+  t() %>% 
+  apply(2,min)
+
+
+countour_data <- cbind(plot_data[, c(1:2)], countour)
+
+colors <- c("Beta" ="#00000F", 
+            "MEMIK" = viridis_colors[3])
+
+pl_beta <- countour_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = countour, color = "MEMIK"), size = 1.5)+
+  geom_line(aes(x = x, y = theo, color = "Beta"))+
+  scale_y_log10(limits = c(1e-15,2))+
+  xlim(c(0,1))+
+  scale_color_manual(values = colors)+
+  labs(
+    y = "",
+    color = ""
+  ) +
+  guides(colour = guide_legend(reverse = TRUE, override.aes = list(
+    size = c(1.5, 0.5)
+  ))) +
+  theme(legend.position = c(0.8, 0.85))+
+  labs(x = "Time", y = "CCDF")
+pl_beta
+
+ggsave(pl_beta, width = 3, height = 3, file = "markov_beta_contour.pdf") 
+
+
+
+# Contour mixture ---------------------------------------------------------
+
+
+source("scripts/markov_functions.R")
+library(CharFun)
+# Make mixture
+mean1 <- 5
+mean2 <- 50
+mean3 <- 100
+sd1 <- 10
+sd2 <- 10
+sd3 <- 10
+
+x_seq <- seq(1, 190, 1)
+mixture_density <- c()
+mixture_ccdf <- c()
+for (x in x_seq) {
+  mixture_density <- c(
+    mixture_density,
+    0.6 * dnorm(x, mean = mean1, sd = sd1) +
+      0.399 * dnorm(x, mean = mean2, sd = sd2) +
+      0.001 * dnorm(x, mean = mean3, sd = sd3)
+  )
+  mixture_ccdf <- c(mixture_ccdf, 1 - (
+    0.6 * pnorm(x, mean = mean1, sd = sd1) +
+      0.399 * pnorm(x, mean = mean2, sd = sd2) +
+      0.001 * pnorm(x, mean = mean3, sd = sd3)
+  ))
+}
+
+plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
+ks <- seq(from = 3, to = 135, by = 1)
+for (k in ks){
+  e_k <- 0.6 * (tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1) )/(1-pnorm(0, mean = mean1, sd = sd1)) + 
+    0.399 * (tail(gaussian_expected_value_k(k+1,mean2, sd2), n = 1))/(1-pnorm(0, mean = mean2, sd = sd2)) + 
+    0.001 * (tail(gaussian_expected_value_k(k+1, mean3, sd3), n = 1))/(1-pnorm(0, mean = mean3, sd = sd3))
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+countour <- plot_data[, -c(1:2)] %>% 
+  t() %>% 
+  apply(2,min)
+
+
+countour_data <- cbind(plot_data[, c(1:2)], countour)
+viridis_colors <- viridis::viridis(4)
+
+
+colors <- c("Gaussian" ="#00000F", 
+            "MEMIK" = viridis_colors[3])
+colors <- c("Gaussian Mixture" ="#00000F", 
+            "MEMIK" = viridis_colors[3])
+
+pl_mix <- countour_data %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = countour, color = "MEMIK"), size = 1.5)+
+  geom_line(aes(x = x, y = theo, color = "Gaussian Mixture"))+
+  scale_y_log10(limits = c(1e-15,8))+
+  scale_color_manual(values = colors,
+                     labels = c("Gaussian\nMixture",
+                                "MEMIK"))+
+  labs(
+    y = "",
+    color = ""
+  ) +
+  guides(colour = guide_legend(reverse = TRUE, override.aes = list(
+    size = c(1.5, 0.5)
+  ))) +
+  theme(legend.position = c(0.8, 0.85))+
+  labs(x = "Time", y = "CCDF")
+pl_mix
+
+ggsave(pl_mix, width = 3, height = 3, file = "markov_mix_contour.pdf") 
 
 # All bounds --------------------------------------------------------------
 
@@ -696,32 +1329,78 @@ plo_frech_2
 ggsave(plo_frech_2, width = 5, height = 3, file = "markov_frechet_2.pdf")
 
 
+# Beta --------------------------------------------------------------------
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+# kth moment of the weibull distribution
+beta_k_moment <- function(k, sh1, sh2){
+  ev_k <- c()
+  ev_k[1] <- sh1/(sh1 + sh2)
+  if(k > 1){
+    for(i in 2:k){
+      ev_k[i] <- ev_k[i - 1]*(sh1 + i - 1)/(sh1 + sh2 + i - 1)
+    }
+  }
+  return(tail(ev_k, n = 1))
+}
+
+x_seq <- seq(from = 0, to = 1, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pbeta(x, shape1 = shape1, shape2 = shape2))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+
+plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
+ks <- seq(from = 1, to = 500, by = 2)
+for (k in ks){
+  e_k <- beta_k_moment(k = k, sh1 = shape1, sh2 = shape2)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+plo_beta <- melt(plot_data, id.vars = c("x", "theo")) %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = theo))+
+  geom_line(aes(x = x, y = value, color = variable), show.legend = F)+
+  scale_y_log10(limits = c(1e-13,10))+
+  scale_color_viridis_d(end = 0.8)+
+  labs(x = "Time", y = "CCDF")
+plo_beta
+ggsave(plo_beta, width = 5, height = 3, file = "markov_beta.pdf")
+
 
 # Reverse Weibull ---------------------------------------------------------
 
 # Make mixture
 location <- 40000
-scale <- 100
-shape <- 1/2
+scale <- 80
+shape <- 4
 
 # kth moment of the weibull distribution
 weibull_k_moment <- function(k, scale, shape){
   (scale^k)*gamma(1 + k/shape)
 }
 
-x_seq <- seq(from = 0, to = 600, length.out = 500)
+x_seq <- seq(from = 0, to = 200, length.out = 500)
 uni_ccdf <- c()
 for (x in x_seq){
-  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = 1/shape, scale = scale))
+  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = shape, scale = scale))
 }
 plot(x_seq, uni_ccdf, log = "y")
 
 
 
 plot_data <- tibble(theo =  uni_ccdf, x = x_seq)
-ks <- seq(from = 1, to = 100, by = 5)
+ks <- seq(from = 1, to = 300, by = 5)
 for (k in ks){
-  e_k <- weibull_k_moment(k = k, shape = 1/shape, scale = scale)
+  e_k <- weibull_k_moment(k = k, shape = shape, scale = scale)
   cota_k <-  as.tibble(e_k / (x_seq)^(k))
   colnames(cota_k) <- paste0("k", k)
   plot_data <- cbind(plot_data, cota_k)
@@ -736,6 +1415,43 @@ plo_weib_2 <- melt(plot_data, id.vars = c("x", "theo")) %>%
   labs(x = "Time", y = "CCDF")
 plo_weib_2
 ggsave(plo_weib_2, width = 5, height = 3, file = "markov_weibull_2.pdf")
+
+
+# Gaussian -----------------------------------------------------------------
+
+# Make mixture
+mean1 <- 100
+sd1 <- 10
+
+
+x_seq <- seq(from = 1,  to = 200, length.out = 1000)
+mixture_ccdf <- c()
+for (x in x_seq){
+  mixture_ccdf <- c(mixture_ccdf, 1 - pnorm(x, mean = mean1, sd = sd1))
+}
+plot(x_seq, mixture_ccdf, log = "y")
+
+
+
+plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
+ks <- seq(from = 1, to = 300, by = 3)
+for (k in ks){
+  e_k <- tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1)
+  cota_k <-  as.tibble(e_k / (x_seq)^(k))
+  colnames(cota_k) <- paste0("k", k)
+  plot_data <- cbind(plot_data, cota_k)
+}
+
+plo_gauss <- melt(plot_data, id.vars = c("x", "theo")) %>% 
+  ggplot()+
+  geom_line(aes(x = x, y = theo))+
+  geom_line(aes(x = x, y = value, color = variable), show.legend = F)+
+  scale_y_log10(limits = c(1e-12,10))+
+  scale_color_viridis_d(end = 0.8)+
+  labs(x = "Time", y = "CCDF")
+plo_gauss
+ggsave(plo_gauss, width = 5, height = 3, file = "markov_gauss_2.pdf")
+
 
 
 # Markov vs EVT -----------------------------------------------------------
@@ -849,7 +1565,7 @@ for (x in x_seq) {
 }
 
 plot_data <- tibble(theo =  mixture_ccdf, x = x_seq)
-ks <- seq(from = 5, to = 120, by = 3)
+ks <- seq(from = 5, to = 150, by = 3)
 for (k in ks){
   e_k <- 0.6 * (tail(gaussian_expected_value_k(k+1, mean1, sd1), n = 1) )/(1-pnorm(0, mean = mean1, sd = sd1)) + 
     0.399 * (tail(gaussian_expected_value_k(k+1,mean2, sd2), n = 1))/(1-pnorm(0, mean = mean2, sd = sd2)) + 
@@ -871,3 +1587,110 @@ plo_evt_gauss
 ggsave(plo_evt_gauss, width = 5, height = 3, file = "markov_evt_gauss.pdf")
 
 ggsave(ggarrange(plo_evt , plo_evt_gauss), width = 10, height = 3, file = "markov_evt_gauss_comb.pdf")
+
+
+# EVT Tails ---------------------------------------------------------------
+
+
+
+# Make mixture
+location <- 40000
+scale <- 100
+shape1 <- 1/8
+shape2 <- 8
+
+x_beta <- seq(from = 0, to = 1, length.out = 500)
+beta_ccdf <- c()
+for (x in x_beta){
+  beta_ccdf <- c(beta_ccdf, 1 - pbeta(x, shape1 = shape1, shape2 = shape2))
+}
+plot(x_beta, beta_ccdf, log = "y")
+
+beta_data <- tibble(ccdf = beta_ccdf, x = x_beta*15000) %>% 
+  filter(ccdf != 0)
+
+
+# Make mixture
+location <- 40000
+scale <- 1000
+shape <- 1/4
+
+
+x_seq <- lseq(from = 1, to = 100000, length.out = 500)
+#x_seq <- lseq(from = 1, to = qfrechet(1- 1e-1, shape = shape, scale = scale), length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - evd::pfrechet(x, shape = 1/shape, scale = scale))
+}
+plot(x_seq, uni_ccdf, log = "y")
+
+frechet_data <- tibble(ccdf = uni_ccdf, x = x_seq) %>% 
+  filter(ccdf != 0)
+
+# Make mixture
+location <- 40000
+scale <- 1000
+
+
+x_seq <- seq(from = 0, to = 50000, length.out = 1000)
+#x_seq <- lseq(from = 1, to = qfrechet(1- 1e-1, shape = shape, scale = scale), length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - evd::pgumbel(x, scale = scale))
+}
+plot(x_seq, uni_ccdf, log = "y")
+gumbel_data <- tibble(ccdf = uni_ccdf, x = x_seq) %>% 
+  filter(ccdf != 0)
+
+
+# Make mixture
+location <- 40000
+scale <- 1000
+shape <- 4
+
+# kth moment of the weibull distribution
+weibull_k_moment <- function(k, scale, shape){
+  (scale^k)*gamma(1 + k/shape)
+}
+
+x_seq <- seq(from = 0, to = 10000, length.out = 500)
+uni_ccdf <- c()
+for (x in x_seq){
+  uni_ccdf <- c(uni_ccdf, 1 - pweibull(x, shape = shape, scale = scale))
+}
+plot(x_seq, uni_ccdf, log = "y")
+a <- tibble(ccdf = uni_ccdf, x = x_seq)
+weibull_data <- tibble(ccdf = uni_ccdf, x = x_seq) %>% 
+  filter(ccdf != 0)
+
+
+viridis_colors <- viridis::viridis(6)
+colors <- c("Weibull" =viridis_colors[1], 
+            "Beta" = viridis_colors[2],
+            "Gumbel" = viridis_colors[3],
+            "Frechet" = viridis_colors[4]
+            )
+
+
+countour_data <- cbind(plot_data[, c(1:2)], countour)
+
+
+p_tails <- ggplot()+
+  geom_line(data=frechet_data, aes(x = x, y = ccdf, color = "Frechet"), size = 1)+
+  geom_line(data=weibull_data, aes(x = x, y = ccdf, color = "Weibull"), size = 1)+
+  geom_line(data=beta_data, aes(x = x, y = ccdf, color = "Beta"), size = 1)+
+  geom_line(data=gumbel_data, aes(x = x, y = ccdf, color = "Gumbel"), size = 1)+
+  scale_color_manual(values = colors,
+                     labels = c("Beta Tail (ξ = -1/8)",
+                                "Heavy Tail (ξ = 1/4)", 
+                                "Exponential Tail (ξ = 0)",
+                                "Light Tail (ξ = -1/4)"
+                                ))+
+  labs(color = "")+
+  theme(legend.position = c(0.8, 0.84))+
+  xlim(c(0, 60000))+
+  scale_y_log10()
+p_tails
+
+ggsave(p_tails, width = 5, height = 3, file = "evt_tails_plot.pdf") 
+
